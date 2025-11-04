@@ -1,37 +1,81 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8">
-    <title>IVPCord Chat</title>
-  </head>
-  <body>
-    <h1>Welcome to IVPCord 💬</h1>
-    <div id="messages"></div>
-    <input id="msg" placeholder="Schreib was..." />
-    <button onclick="sendMsg()">Send</button>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IVPCord</title>
+<style>
+  body { margin:0; font-family:'Segoe UI',sans-serif; background:#36393f; color:#fff; display:flex; height:100vh; }
+  .sidebar { width:80px; background:#2f3136; display:flex; flex-direction:column; align-items:center; padding-top:10px; }
+  .sidebar button { width:50px; height:50px; margin:10px 0; border-radius:50%; border:none; background:#7289da; color:#fff; font-size:24px; cursor:pointer; }
+  .chat-container { flex:1; display:flex; flex-direction:column; }
+  .messages { flex:1; overflow-y:auto; padding:20px; }
+  .message { margin-bottom:15px; display:flex; gap:10px; align-items:flex-start; }
+  .avatar { width:40px; height:40px; border-radius:50%; background:#7289da; }
+  .content { background:#40444b; padding:10px 15px; border-radius:5px; max-width:70%; }
+  .input-area { display:flex; padding:10px; background:#40444b; }
+  .input-area input { flex:1; padding:10px; border-radius:5px; border:none; outline:none; margin-right:10px; background:#2f3136; color:#fff; }
+  .input-area button { padding:10px 20px; border:none; border-radius:5px; background:#7289da; color:#fff; cursor:pointer; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.10.0/dist/supabase.min.js"></script>
+</head>
+<body>
 
-    <script src="https://unpkg.com/@supabase/supabase-js"></script>
-    <script>
-      // HIER DEINE SUPABASE DATEN REIN
-      const SUPABASE_URL = "https://bniigvwihpigupfjvqcb.supabase.co"
-      const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJuaWlndndpaHBpZ3VwZmp2cWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIyODI1MzMsImV4cCI6MjA3Nzg1ODUzM30.5VYudCVv246Pa0Ilz3Q09N3adFygbZm6sXahrcr3knk"
+<div class="sidebar">
+  <button>🏠</button>
+  <button>💬</button>
+  <button>⚙️</button>
+</div>
 
-      const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+<div class="chat-container">
+  <div class="messages" id="messages"></div>
+  <div class="input-area">
+    <input type="text" id="messageInput" placeholder="Schreib was...">
+    <button id="sendBtn">Send</button>
+  </div>
+</div>
 
-      async function loadMessages() {
-        const { data } = await supabase.from('messages').select('*').limit(10)
-        document.getElementById('messages').innerHTML =
-          data.map(m => `<p>${m.content}</p>`).join('')
-      }
+<script>
+  // Supabase config
+  const supabaseUrl = 'https://bniigvwihpigupfjvqcb.supabase.co'; // deine Supabase URL
+  const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJuaWlndndpaHBpZ3VwZmp2cWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIyODI1MzMsImV4cCI6MjA3Nzg1ODUzM30.5VYudCVv246Pa0Ilz3Q09N3adFygbZm6sXahrcr3knk'; // ersetze durch deinen Anon Key
+  const supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
-      async function sendMsg() {
-        const msg = document.getElementById('msg').value
-        await supabase.from('messages').insert([{ content: msg, channel_id: 'dein_channel_id', user_id: 'deine_user_id' }])
-        document.getElementById('msg').value = ''
-        loadMessages()
-      }
+  const messagesDiv = document.getElementById('messages');
+  const input = document.getElementById('messageInput');
+  const sendBtn = document.getElementById('sendBtn');
 
-      loadMessages()
-    </script>
-  </body>
+  // Nachricht senden
+  async function sendMessage() {
+    const text = input.value.trim();
+    if (!text) return;
+    await supabase.from('messages').insert([{ content: text, user_id: 'anonymous', channel_id: 'default' }]);
+    input.value = '';
+  }
+
+  sendBtn.addEventListener('click', sendMessage);
+  input.addEventListener('keypress', e => { if(e.key==='Enter') sendMessage(); });
+
+  // Nachrichten live laden
+  async function loadMessages() {
+    const { data } = await supabase.from('messages').select('*').order('created_at', { ascending:true });
+    messagesDiv.innerHTML = '';
+    data.forEach(msg => {
+      const m = document.createElement('div');
+      m.className = 'message';
+      m.innerHTML = `<div class="avatar"></div><div class="content">${msg.content}</div>`;
+      messagesDiv.appendChild(m);
+    });
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  }
+
+  loadMessages();
+
+  // Echtzeit Updates
+  supabase.channel('public:messages').on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, payload => {
+    loadMessages();
+  }).subscribe();
+</script>
+
+</body>
 </html>
